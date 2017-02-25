@@ -59,24 +59,31 @@ namespace SharpRaven.Log4Net
                 };
             }
 
-            var tags = tagLayouts.ToDictionary(t => t.Name, t => (t.Layout.Format(loggingEvent) ?? "").ToString());
-
             var exception = loggingEvent.ExceptionObject ?? loggingEvent.MessageObject as Exception;
             var level = Translate(loggingEvent.Level);
 
+            SentryEvent @event = null;
             if (exception != null)
             {
-                ravenClient.CaptureException(exception, null, level, tags: tags, extra: extra);
+                @event = new SentryEvent(exception);
+                ravenClient.Capture(@event);
             }
             else
             {
                 var message = loggingEvent.RenderedMessage;
-
                 if (message != null)
-                {
-                    ravenClient.CaptureMessage(message, level, tags, extra);
-                }
+                    @event = new SentryEvent(new SentryMessage(message));
             }
+            if (@event!=null)
+            {
+                @event.Level = level;
+                if (tagLayouts.Count>0)
+                    foreach (var item in tagLayouts)
+                        @event.Tags.Add(item.Name, (item.Layout.Format(loggingEvent) ?? "").ToString());
+                @event.Extra = extra;
+                ravenClient.Capture(@event);
+            }
+            
         }
 
 
